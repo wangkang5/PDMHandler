@@ -9,10 +9,15 @@ class PDMHandler(object):
   TBL_ATTR_LIST    = ["Name","Code","CreationDate","Creator","ModificationDate","Modifier",
                       "PhysicalOptions"]
   COL_ATTR_LIST    = ["Name","Code","CreationDate","Creator","ModificationDate","Modifier",
-                      "DataType","Length","Column.Mandatory","Comment"]
+                      "DataType","Length","Column.Mandatory","DefaultValue","Comment"]
   IDX_ATTR_LIST    = ["Name","Code","CreationDate","Creator","ModificationDate","Modifier",
                       "PhysicalOptions","Unique"]
   IDXCOL_ATTR_LIST = ["CreationDate","Creator","ModificationDate","Modifier"]
+  KEY_ATTR_LIST    = ["Name","Code","CreationDate","Creator","ModificationDate","Modifier",
+                      "ConstraintName"]
+  KEYCOL_ATTR_LIST = []
+  PK_ATTR_LIST = []
+  USR_ATTR_LIST = ["Name","Code","CreationDate","Creator","ModificationDate","Modifier"]
   def __init__(self):
     return
 
@@ -128,6 +133,14 @@ class PDMHandler(object):
     """
     return PDMHandler.__get_nodes_by_path(pkgnode, "c:Tables/o:Table")
   @staticmethod
+  def getUsrNodesInPkg(pkgnode):
+    """
+    @brief       获取指定o:Package下的所有o:User的list
+    @param[in]   pkgnode 待处理的o:Package节点(可通过PDMHandler.getPkgNodes取得)
+    @return      返回o:User的节点list:[usr1,usr2...],元素为DOM节点类型
+    """
+    return PDMHandler.__get_nodes_by_path(pkgnode, "c:Users/o:User")
+  @staticmethod
   def getColNodesInTbl(tblnode):
     """
     @brief       获取指定o:Table下的所有o:Column的list
@@ -144,6 +157,22 @@ class PDMHandler(object):
     """
     return PDMHandler.__get_nodes_by_path(tblnode, "c:Indexes/o:Index")
   @staticmethod
+  def getKeyNodesInTbl(tblnode):
+    """
+    @brief       获取指定o:Table下的所有o:Index的list
+    @param[in]   tblnode 待处理的o:Table节点(可通过PDMHandler.getTblInPkg取得)
+    @return      返回o:Key的节点list:[key1,key2...],元素为DOM节点类型
+    """
+    return PDMHandler.__get_nodes_by_path(tblnode, "c:Keys/o:Key")
+  @staticmethod
+  def getPkNodesInTbl(tblnode):
+    """
+    @brief       获取指定o:Table下的所有o:Key的list
+    @param[in]   tblnode 待处理的o:Table节点(可通过PDMHandler.getTblInPkg取得)
+    @return      返回o:PrimaryKey的节点list:[key1,key2...],元素为DOM节点类型
+    """
+    return PDMHandler.__get_nodes_by_path(tblnode, "c:PrimaryKey/o:Key")
+  @staticmethod
   def getIdxColNodesInIdx(idxnode):
     """
     @brief       获取指定o:Index下的所有o:IndexColumn的list
@@ -151,6 +180,15 @@ class PDMHandler(object):
     @return      返回o:IndexColumn的节点list:[idxcol1,idxcol2...],元素为DOM节点类型
     """
     return PDMHandler.__get_nodes_by_path(idxnode,"c:IndexColumns/o:IndexColumn")
+
+  @staticmethod
+  def getKeyColNodesInKey(keynode):
+    """
+    @brief       获取指定o:Key下的所有o:Column的list
+    @param[in]   keynode 待处理的c:Key节点(可通过PDMHandler.getKeyNodesInTbl取得)
+    @return      返回o:Column的节点list:[keycol1,keycol2...],元素为DOM节点类型
+    """
+    return PDMHandler.__get_nodes_by_path(keynode,"c:Key.Columns/o:Column")
 
   @staticmethod
   def getPkgAttrs(pkgnode):
@@ -167,7 +205,29 @@ class PDMHandler(object):
     @param[in]   tblnode 待处理的o:Table节点(可通过PDMHandler.getTblNodesInPkg取得)
     @return      返回一个字典dict:{"attr1":"value",...}
     """
-    return PDMHandler.__get_attrs_by_list(tblnode,PDMHandler.TBL_ATTR_LIST)
+    ret_dict = PDMHandler.__get_attrs_by_list(tblnode,PDMHandler.TBL_ATTR_LIST)
+    refcol   = PDMHandler.__get_nodes_by_path(tblnode,"c:Owner/o:User")
+    try:
+      ret_dict["User"] = refcol[0].getAttribute("Ref")
+    except IndexError :
+      ret_dict["User"] = ""
+      return ret_dict
+    return ret_dict
+  @staticmethod
+  def getUsrAttrs(usrnode):
+    """
+    @brief       获取指定o:User的属性(可取的属性参见PDMHandler.USR_ATTR_LIST)
+    @param[in]   tblnode 待处理的o:Table节点(可通过PDMHandler.getTblNodesInPkg取得)
+    @return      返回一个字典dict:{"attr1":"value",...}
+    """
+    ret_dict = PDMHandler.__get_attrs_by_list(usrnode,PDMHandler.USR_ATTR_LIST)
+    try:
+      ret_dict["Id"] = usrnode.getAttribute("Id")
+    except IndexError :
+      ret_dict["Id"] = ""
+      return ret_dict
+    return ret_dict
+
   @staticmethod
   def getColAttrs(colnode):
     """
@@ -185,6 +245,35 @@ class PDMHandler(object):
     """
     return PDMHandler.__get_attrs_by_list(idxnode,PDMHandler.IDX_ATTR_LIST)
   @staticmethod
+  def getKeyAttrs(keynode):
+    """
+    @brief       获取指定o:Index的属性(可取的属性参见PDMHandler.KEY_ATTR_LIST)
+    @param[in]   keynode 待处理的o:Index节点(可通过PDMHandler.getKeyNodesInTbl取得)
+    @return      返回一个字典dict:{"attr1":"value",...}
+    """
+    ret_dict = PDMHandler.__get_attrs_by_list(keynode,PDMHandler.KEY_ATTR_LIST)
+    try:
+      ret_dict["RefColCode"] = keynode.getAttribute("Id")
+    except IndexError :
+      ret_dict["RefColCode"] = ""
+      return ret_dict
+    return ret_dict
+  @staticmethod
+  def getPkAttrs(pknode):
+    """
+    @brief       获取指定o:Index的属性(可取的属性参见PDMHandler.PK_ATTR_LIST)
+    @param[in]   keynode 待处理的o:Key节点(可通过PDMHandler.getKeyNodesInTbl取得)
+    @return      返回一个字典dict:{"attr1":"value",...}
+    """
+    ret_dict = PDMHandler.__get_attrs_by_list(pknode,PDMHandler.PK_ATTR_LIST)
+    try:
+      ret_dict["RefColCode"] = pknode.getAttribute("Ref")
+    except IndexError :
+      ret_dict["RefColCode"] = ""
+      return ret_dict
+    return ret_dict
+
+  @staticmethod
   def getIdxColAttrs(idxcolnode):
     """
     @brief       获取指定o:IndexColumn的属性(可取的属性参见PDMHandler.IDXCOL_ATTR_LIST)
@@ -200,6 +289,33 @@ class PDMHandler(object):
       return ret_dict
     #-- 补充引用列插入字典 --#
     currnode = idxcolnode
+    while(1) :
+      currnode = currnode.parentNode
+      if currnode.tagName == "o:Table" or currnode == None :
+        break
+    if currnode == None :
+      return []
+    else :
+      for col in PDMHandler.getColNodesInTbl(currnode) :
+        if col.getAttribute("Id") == refcolid :
+          ret_dict["RefColCode"] = PDMHandler.getColAttrs(col)["Code"]
+    return ret_dict
+
+  @staticmethod
+  def getKeyColAttrs(keycolnode):
+    """
+    @brief       获取指定o:Column的属性(可取的属性参见PDMHandler.KEYCOL_ATTR_LIST)
+    @param[in]   keycolnode 待处理的o:Column节点(可通过PDMHandler.getKeyColNodesInKey取得)
+    @return      返回一个字典dict:{"attr1":"value",...}
+    """
+    ret_dict = PDMHandler.__get_attrs_by_list(keycolnode,PDMHandler.KEYCOL_ATTR_LIST)
+    try:
+      refcolid = keycolnode.getAttribute("Ref")
+    except IndexError :
+      ret_dict["RefColCode"] = ""
+      return ret_dict
+    #-- 补充引用列插入字典 --#
+    currnode = keycolnode
     while(1) :
       currnode = currnode.parentNode
       if currnode.tagName == "o:Table" or currnode == None :
